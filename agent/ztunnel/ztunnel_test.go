@@ -23,6 +23,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// testTimeout is the per-test deadline used when waiting for goroutines.
+const testTimeout = 2 * time.Second
+
 // mockSocks5Server is a minimal SOCKS5 server used for testing DialSocks5 and
 // the full proxy pipeline.  It supports only "no auth" and CONNECT (IPv4 and
 // domain-name address types).
@@ -140,7 +143,7 @@ func TestDialSocks5_IPv4(t *testing.T) {
 	select {
 	case dst := <-srv.connectedDst:
 		assert.Equal(t, "1.2.3.4:8080", dst)
-	case <-time.After(2 * time.Second):
+	case <-time.After(testTimeout):
 		t.Fatal("timed out waiting for SOCKS5 server to record destination")
 	}
 }
@@ -160,7 +163,7 @@ func TestDialSocks5_Domain(t *testing.T) {
 	select {
 	case dst := <-srv.connectedDst:
 		assert.Equal(t, "example.com:443", dst)
-	case <-time.After(2 * time.Second):
+	case <-time.After(testTimeout):
 		t.Fatal("timed out waiting for SOCKS5 server to record destination")
 	}
 }
@@ -183,7 +186,7 @@ func TestDialSocks5_DataForwarding(t *testing.T) {
 	assert.NoError(t, err)
 
 	buf := make([]byte, len(payload))
-	conn.SetReadDeadline(time.Now().Add(2 * time.Second)) //nolint:errcheck
+	conn.SetReadDeadline(time.Now().Add(testTimeout)) //nolint:errcheck
 	_, err = io.ReadFull(conn, buf)
 	assert.NoError(t, err)
 	assert.Equal(t, payload, buf)
@@ -247,7 +250,7 @@ func TestProxyBidirectional(t *testing.T) {
 	}()
 
 	buf := make([]byte, len(msg1))
-	bRemote.SetReadDeadline(time.Now().Add(2 * time.Second)) //nolint:errcheck
+	bRemote.SetReadDeadline(time.Now().Add(testTimeout)) //nolint:errcheck
 	_, err := io.ReadFull(bRemote, buf)
 	assert.NoError(t, err)
 	assert.Equal(t, msg1, buf)
@@ -258,7 +261,7 @@ func TestProxyBidirectional(t *testing.T) {
 	}()
 
 	buf2 := make([]byte, len(msg2))
-	aRemote.SetReadDeadline(time.Now().Add(2 * time.Second)) //nolint:errcheck
+	aRemote.SetReadDeadline(time.Now().Add(testTimeout)) //nolint:errcheck
 	_, err = io.ReadFull(aRemote, buf2)
 	assert.NoError(t, err)
 	assert.Equal(t, msg2, buf2)
