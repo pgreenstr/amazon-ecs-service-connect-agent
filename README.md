@@ -185,7 +185,7 @@ These environment variables enable the agent to run as a transparent TCP-to-SOCK
 
 When ZTunnel mode is enabled, the agent does **not** start Envoy.  Instead it listens on the ECS proxy outbound redirect port, recovers each connection's original destination via the Linux `SO_ORIGINAL_DST` socket option (set by the iptables redirect rule), and tunnels each connection through ZTunnel's SOCKS5 interface.
 
-This lets you re-use the existing ECS proxy iptables configuration (used for App Mesh / Service Connect) as the traffic interception mechanism for Istio ambient mesh when running on Amazon ECS, as described in the [Gloo Mesh ECS ambient integration](https://docs.solo.io/gloo-mesh/latest/ambient/setup/sample-apps/ecs-integration/).
+This lets you re-use the existing ECS proxy iptables configuration (used for App Mesh / Service Connect) as the traffic interception mechanism for Istio ambient mesh when running on Amazon ECS.  For background on how this pattern is used in practice, see the [Gloo Mesh ECS ambient integration guide](https://docs.solo.io/gloo-mesh/latest/ambient/setup/sample-apps/ecs-integration/) (note: external links may change over time; search for "ECS Istio ambient" for the latest guidance).
 
 |Environment Key	|Example Value(s)	|Description	|Default Value	|
 |---	|---	|---	|---	|
