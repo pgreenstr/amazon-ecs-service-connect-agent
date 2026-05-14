@@ -179,6 +179,21 @@ These environment variables offer controls to alter the agent functionality when
 |`RELAY_STREAM_IDLE_TIMEOUT`  | 2000s | Timeout value for connection between the agent in relay mode and the management server. | 2400s |
 |`RELAY_BUFFER_LIMIT_BYTES`  | 10485760 | Allows for configurable connection buffer limit for agent in relay mode. | 10485760 |
 
+**Istio ZTunnel Mode Environment Variables**
+
+These environment variables enable the agent to run as a transparent TCP-to-SOCKS5 forwarding proxy for [Istio ZTunnel](https://github.com/istio/ztunnel) sidecars.
+
+When ZTunnel mode is enabled, the agent does **not** start Envoy.  Instead it listens on the ECS proxy outbound redirect port, recovers each connection's original destination via the Linux `SO_ORIGINAL_DST` socket option (set by the iptables redirect rule), and tunnels each connection through ZTunnel's SOCKS5 interface.
+
+This lets you re-use the existing ECS proxy iptables configuration (used for App Mesh / Service Connect) as the traffic interception mechanism for Istio ambient mesh when running on Amazon ECS.  For background on how this pattern is used in practice, see the [Gloo Mesh ECS ambient integration guide](https://docs.solo.io/gloo-mesh/latest/ambient/setup/sample-apps/ecs-integration/).
+
+|Environment Key	|Example Value(s)	|Description	|Default Value	|
+|---	|---	|---	|---	|
+|`ENABLE_ZTUNNEL_MODE`	|<true &#124; false>	|When `true`, the agent starts a transparent TCP-to-SOCKS5 proxy instead of Envoy.  Envoy is not started in this mode.	|false	|
+|`ZTUNNEL_SOCKS_ADDR`	|127.0.0.1	|IP address of the ZTunnel sidecar's SOCKS5 listener.	|127.0.0.1	|
+|`ZTUNNEL_SOCKS_PORT`	|15080	|Port of the ZTunnel sidecar's SOCKS5 listener.	|15080	|
+|`ZTUNNEL_OUTBOUND_PORT`	|15001	|Local TCP port on which the agent's transparent proxy listens for iptables-redirected outbound application traffic.	|15001	|
+
 **Management Server Operating Environment Variables**
 
 These environment variables are used to pass operating platform/environment information to the management server for control plane operations and dynamic configuration generation.

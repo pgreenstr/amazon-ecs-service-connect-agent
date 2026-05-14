@@ -332,3 +332,47 @@ func TestSkipDeprecatedLogsInvalidValue(t *testing.T) {
 	agentConfig.SetDefaults()
 	assert.True(t, agentConfig.SkipDeprecatedLogs) // Should fall back to default (true)
 }
+
+func TestZTunnelModeDefaults(t *testing.T) {
+	var agentConfig AgentConfig
+	agentConfig.SetDefaults()
+
+	assert.False(t, agentConfig.EnableZTunnelMode)
+	assert.Empty(t, agentConfig.ZTunnelSocksAddr)
+	assert.Zero(t, agentConfig.ZTunnelSocksPort)
+	assert.Zero(t, agentConfig.ZTunnelOutboundPort)
+}
+
+func TestZTunnelModeEnabled(t *testing.T) {
+	// Use non-default values to verify that the environment variables are
+	// actually read and override the built-in defaults.
+	os.Setenv("ENABLE_ZTUNNEL_MODE", "true")
+	os.Setenv("ZTUNNEL_SOCKS_ADDR", "127.0.0.2")
+	os.Setenv("ZTUNNEL_SOCKS_PORT", "19080")
+	os.Setenv("ZTUNNEL_OUTBOUND_PORT", "15002")
+	defer os.Unsetenv("ENABLE_ZTUNNEL_MODE")
+	defer os.Unsetenv("ZTUNNEL_SOCKS_ADDR")
+	defer os.Unsetenv("ZTUNNEL_SOCKS_PORT")
+	defer os.Unsetenv("ZTUNNEL_OUTBOUND_PORT")
+
+	var agentConfig AgentConfig
+	agentConfig.SetDefaults()
+
+	assert.True(t, agentConfig.EnableZTunnelMode)
+	assert.Equal(t, "127.0.0.2", agentConfig.ZTunnelSocksAddr)
+	assert.Equal(t, 19080, agentConfig.ZTunnelSocksPort)
+	assert.Equal(t, 15002, agentConfig.ZTunnelOutboundPort)
+}
+
+func TestZTunnelModeDefaultValues(t *testing.T) {
+	os.Setenv("ENABLE_ZTUNNEL_MODE", "true")
+	defer os.Unsetenv("ENABLE_ZTUNNEL_MODE")
+
+	var agentConfig AgentConfig
+	agentConfig.SetDefaults()
+
+	assert.True(t, agentConfig.EnableZTunnelMode)
+	assert.Equal(t, ZTUNNEL_SOCKS_ADDR_DEFAULT, agentConfig.ZTunnelSocksAddr)
+	assert.Equal(t, ZTUNNEL_SOCKS_PORT_DEFAULT, agentConfig.ZTunnelSocksPort)
+	assert.Equal(t, ZTUNNEL_OUTBOUND_PORT_DEFAULT, agentConfig.ZTunnelOutboundPort)
+}

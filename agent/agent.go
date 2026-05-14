@@ -36,6 +36,7 @@ import (
 	"github.com/aws/aws-app-mesh-agent/agent/server"
 	"github.com/aws/aws-app-mesh-agent/agent/stats"
 	"github.com/aws/aws-app-mesh-agent/agent/stats/snapshot"
+	"github.com/aws/aws-app-mesh-agent/agent/ztunnel"
 	cap "kernel.org/pub/linux/libs/security/libcap/cap"
 
 	log "github.com/sirupsen/logrus"
@@ -584,6 +585,26 @@ func main() {
 
 	agentConfig.ParseFlags(os.Args)
 	agentConfig.SetDefaults()
+
+	// ZTunnel mode: skip Envoy bootstrap and start a transparent TCP-to-SOCKS5
+	// forwarding proxy instead of Envoy.
+	if agentConfig.EnableZTunnelMode {
+		log.Infof("ZTunnel mode enabled: starting transparent proxy on port %d, forwarding to %s:%d",
+			agentConfig.ZTunnelOutboundPort,
+			agentConfig.ZTunnelSocksAddr,
+			agentConfig.ZTunnelSocksPort)
+
+		proxy := &ztunnel.Proxy{
+			ListenAddr:  fmt.Sprintf("0.0.0.0:%d", agentConfig.ZTunnelOutboundPort),
+			ZTunnelAddr: fmt.Sprintf("%s:%d", agentConfig.ZTunnelSocksAddr, agentConfig.ZTunnelSocksPort),
+		}
+
+		if err := proxy.Run(); err != nil {
+			log.Errorf("ZTunnel proxy exited with error: %v", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
 
 	// TODO: Move this logic to envoy_bootstrap.go so we can write unit test for it.
 	if agentConfig.EnableRelayModeForXds {

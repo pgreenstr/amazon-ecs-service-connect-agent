@@ -78,6 +78,12 @@ const (
 	RELAY_BUFFER_LIMIT_BYTES_DEFAULT       = 10485760 // Default is set to 10MB, whereas Envoy default is 1 MB.
 	APPNET_MANAGEMENT_PORT_DEFAULT         = 443
 
+	// ZTunnel mode – transparent TCP-to-SOCKS5 forwarding to an Istio ZTunnel sidecar.
+	ENABLE_ZTUNNEL_MODE_DEFAULT   = false
+	ZTUNNEL_SOCKS_ADDR_DEFAULT    = "127.0.0.1"
+	ZTUNNEL_SOCKS_PORT_DEFAULT    = 15080
+	ZTUNNEL_OUTBOUND_PORT_DEFAULT = 15001
+
 	// agent handled endpoints
 	AGENT_STATS_ENDPOINT_URL          = "/stats/prometheus"
 	AGENT_STATUS_ENDPOINT_URL         = "/status"
@@ -174,6 +180,15 @@ type AgentConfig struct {
 	AppNetRelayListenerUdsPath string
 	RelayStreamIdleTimeout     string
 	RelayBufferLimitBytes      int
+
+	// ZTunnel Mode – when enabled the agent acts as a transparent TCP-to-SOCKS5
+	// proxy that receives traffic intercepted by the ECS proxy iptables rules and
+	// forwards it to the Istio ZTunnel sidecar's SOCKS5 interface.  Envoy is not
+	// started in this mode.
+	EnableZTunnelMode   bool
+	ZTunnelSocksAddr    string
+	ZTunnelSocksPort    int
+	ZTunnelOutboundPort int
 
 	// Libcurl deprecation Envoy reloadable feature flag
 	EnvoyUseHttpClientToFetchAwsCredentials bool
@@ -463,6 +478,14 @@ func (config *AgentConfig) SetDefaults() {
 		} else {
 			config.AppNetManagementDomainName = xdsDomain
 		}
+	}
+
+	// ZTunnel Mode – transparent TCP-to-SOCKS5 proxy for Istio ZTunnel sidecars.
+	config.EnableZTunnelMode = getEnvValueAsBool("ENABLE_ZTUNNEL_MODE", ENABLE_ZTUNNEL_MODE_DEFAULT)
+	if config.EnableZTunnelMode {
+		config.ZTunnelSocksAddr = getEnvValueAsString("ZTUNNEL_SOCKS_ADDR", ZTUNNEL_SOCKS_ADDR_DEFAULT)
+		config.ZTunnelSocksPort = getEnvValueAsInt("ZTUNNEL_SOCKS_PORT", ZTUNNEL_SOCKS_PORT_DEFAULT)
+		config.ZTunnelOutboundPort = getEnvValueAsInt("ZTUNNEL_OUTBOUND_PORT", ZTUNNEL_OUTBOUND_PORT_DEFAULT)
 	}
 
 	// Libcurl deprecation Envoy reloadable feature flag
