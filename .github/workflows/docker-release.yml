@@ -43,12 +43,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ -n "${ENVOY_IMAGE}" ]; then
-            echo "IMAGE_STRING=${ENVOY_IMAGE}" >> "$GITHUB_ENV"
+          if [ -n "${ENVOY_IMAGE:-}" ]; then
+            IMAGE_STRING="${ENVOY_IMAGE}"
           else
-            IMAGE_STRING="$(aws ssm get-parameter --name "/aws/service/appmesh/envoy" --query Parameter.Value --output text)"
-            echo "IMAGE_STRING=${IMAGE_STRING}" >> "$GITHUB_ENV"
+            if ! IMAGE_STRING="$(aws ssm get-parameter --name "/aws/service/appmesh/envoy" --query Parameter.Value --output text)"; then
+              echo "Failed to resolve Envoy base image from SSM parameter /aws/service/appmesh/envoy"
+              exit 1
+            fi
           fi
+
+          if ! [[ "${IMAGE_STRING}" =~ ^[A-Za-z0-9./:_@-]+$ ]]; then
+            echo "Invalid Envoy image URI: ${IMAGE_STRING}"
+            exit 1
+          fi
+
+          echo "IMAGE_STRING=${IMAGE_STRING}" >> "$GITHUB_ENV"
 
       - name: Build agent binary
         shell: bash
