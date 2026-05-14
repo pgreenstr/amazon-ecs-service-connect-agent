@@ -1,0 +1,84 @@
+name: Docker Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      image-tag:
+        description: Docker image tag to publish
+        required: true
+      aws-region:
+        description: AWS region where ECR repository exists
+        required: true
+        default: us-west-2
+      ecr-repository:
+        description: ECR repository name
+        required: true
+      envoy-image:
+        description: Base Envoy image URI (optional)
+        required: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ inputs.aws-region }}
+      ECR_REPOSITORY: ${{ inputs.ecr-repository }}
+      IMAGE_TAG: ${{ inputs.image-tag }}
+      ENVOY_IMAGE: ${{ inputs.envoy-image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Determine Envoy base image
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${ENVOY_IMAGE}" ]; then
+            echo "IMAGE_STRING=${ENVOY_IMAGE}" >> "$GITHUB_ENV"
+          else
+            IMAGE_STRING="$(aws ssm get-parameter --name "/aws/service/appmesh/envoy" --query Parameter.Value --output text)"
+            echo "IMAGE_STRING=${IMAGE_STRING}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build agent binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd agent
+          ./docker-build.sh go-build
+
+      - name: Generate release Dockerfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > agent/Dockerfile.release <<EOF
+          FROM ${IMAGE_STRING}
+          COPY agent /usr/bin/agent
+          COPY resources/bootstrap_configs/relay_bootstrap.yaml /agent-resources/bootstrap_configs/relay_bootstrap.yaml
+          CMD /usr/bin/agent
+          EOF
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        shell: bash
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          set -euo pipefail
+          IMAGE_URI="${REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+          docker build -f agent/Dockerfile.release -t "${IMAGE_URI}" agent
+          docker push "${IMAGE_URI}"
+          echo "Published ${IMAGE_URI}"

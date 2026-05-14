@@ -74,6 +74,19 @@ docker-build:
 
 Use these two example files above, the Dockerfile.agent and Makefile, and place them in a single directory within the agent directory and issue the `make docker-build` command. The resulting `ecs-service-connect:latest` can be used in ECS Service Connect or App Mesh as a sidecar.
 
+### Option 3: GitHub Actions release to ECR
+
+This repository includes a `Docker Release` workflow (`.github/workflows/docker-release.yml`) that builds and publishes an image to Amazon ECR using AWS OIDC.
+
+Before running the workflow, configure the repository secret `AWS_ROLE_TO_ASSUME` with an IAM role ARN trusted for your GitHub OIDC provider and permitted to push to ECR.
+
+Run the workflow manually from the Actions tab and provide:
+
+* `image-tag` (required): image tag to publish.
+* `aws-region` (required): AWS region for ECR (defaults to `us-west-2`).
+* `ecr-repository` (required): destination ECR repository name.
+* `envoy-image` (optional): base Envoy image URI. If omitted, the workflow uses the latest value from SSM parameter `/aws/service/appmesh/envoy`.
+
 ## Advanced Usage
 
 The Amazon ECS Service Connect Agent supports using a few environment variables to alter some aspects of the Envoy's behavior. These variables are outlined below, and documented in the AWS App Mesh [User Guide](https://docs.aws.amazon.com/app-mesh/latest/userguide/envoy-config.html). These environment variables can be configured when used with AWS App Mesh, and they are not configurable when used with ECS Service Connect.
