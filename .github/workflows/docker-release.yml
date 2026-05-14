@@ -61,12 +61,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat > agent/Dockerfile.release <<EOF
-          FROM ${IMAGE_STRING}
-          COPY agent /usr/bin/agent
-          COPY resources/bootstrap_configs/relay_bootstrap.yaml /agent-resources/bootstrap_configs/relay_bootstrap.yaml
-          CMD /usr/bin/agent
-          EOF
+          printf '%s\n' \
+            "FROM ${IMAGE_STRING}" \
+            "COPY agent /usr/bin/agent" \
+            "COPY resources/bootstrap_configs/relay_bootstrap.yaml /agent-resources/bootstrap_configs/relay_bootstrap.yaml" \
+            "CMD /usr/bin/agent" \
+            > agent/Dockerfile.release
 
       - name: Login to Amazon ECR
         id: login-ecr
