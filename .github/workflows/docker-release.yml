@@ -2,20 +2,10 @@ name: Docker Release
 
 on:
   workflow_dispatch:
-    inputs:
-      image-tag:
-        description: Docker image tag to publish
-        required: true
-      aws-region:
-        description: AWS region where ECR repository exists
-        required: true
-        default: us-west-2
-      ecr-repository:
-        description: ECR repository name
-        required: true
-      envoy-image:
-        description: Base Envoy image URI (optional)
-        required: false
+
+env:
+  AWS_REGION: us-west-2
+  ECR_REPOSITORY: ecs-service-connect-agent
 
 permissions:
   id-token: write
@@ -24,14 +14,11 @@ permissions:
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
-    env:
-      AWS_REGION: ${{ inputs.aws-region }}
-      ECR_REPOSITORY: ${{ inputs.ecr-repository }}
-      IMAGE_TAG: ${{ inputs.image-tag }}
-      ENVOY_IMAGE: ${{ inputs.envoy-image }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -39,25 +26,27 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Determine Envoy base image
+      - name: Determine semantic image tag
+        id: semver
         shell: bash
         run: |
           set -euo pipefail
-          if [ -n "${ENVOY_IMAGE:-}" ]; then
-            IMAGE_STRING="${ENVOY_IMAGE}"
+          git fetch --tags --force
+          LATEST_TAG="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1)"
+
+          if [ -z "${LATEST_TAG}" ]; then
+            NEXT_TAG="v0.1.0"
           else
-            if ! IMAGE_STRING="$(aws ssm get-parameter --name "/aws/service/appmesh/envoy" --query Parameter.Value --output text)"; then
-              echo "Failed to resolve Envoy base image from SSM parameter /aws/service/appmesh/envoy"
+            VERSION="${LATEST_TAG#v}"
+            IFS='.' read -r MAJOR MINOR PATCH <<< "${VERSION}"
+            if ! [[ "${MAJOR}" =~ ^[0-9]+$ && "${MINOR}" =~ ^[0-9]+$ && "${PATCH}" =~ ^[0-9]+$ ]]; then
+              echo "Latest tag is not a valid semantic version: ${LATEST_TAG}"
               exit 1
             fi
+            NEXT_TAG="v${MAJOR}.${MINOR}.$((PATCH + 1))"
           fi
-
-          if ! [[ "${IMAGE_STRING}" =~ ^[A-Za-z0-9./:_@-]+$ ]]; then
-            echo "Invalid Envoy image URI: ${IMAGE_STRING}"
-            exit 1
-          fi
-
-          echo "IMAGE_STRING=${IMAGE_STRING}" >> "$GITHUB_ENV"
+          echo "image_tag=${NEXT_TAG}" >> "$GITHUB_OUTPUT"
+          echo "Using image tag: ${NEXT_TAG}"
 
       - name: Build agent binary
         shell: bash
@@ -65,17 +54,6 @@ jobs:
           set -euo pipefail
           cd agent
           ./docker-build.sh go-build
-
-      - name: Generate release Dockerfile
-        shell: bash
-        run: |
-          set -euo pipefail
-          printf '%s\n' \
-            "FROM ${IMAGE_STRING}" \
-            "COPY agent /usr/bin/agent" \
-            "COPY resources/bootstrap_configs/relay_bootstrap.yaml /agent-resources/bootstrap_configs/relay_bootstrap.yaml" \
-            "CMD /usr/bin/agent" \
-            > agent/Dockerfile.release
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -87,7 +65,7 @@ jobs:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
           set -euo pipefail
-          IMAGE_URI="${REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
-          docker build -f agent/Dockerfile.release -t "${IMAGE_URI}" agent
+          IMAGE_URI="${REGISTRY}/${ECR_REPOSITORY}:${{ steps.semver.outputs.image_tag }}"
+          docker build -f agent/Dockerfile.build -t "${IMAGE_URI}" agent
           docker push "${IMAGE_URI}"
           echo "Published ${IMAGE_URI}"

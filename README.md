@@ -80,12 +80,14 @@ This repository includes a `Docker Release` workflow (`.github/workflows/docker-
 
 Before running the workflow, configure the repository secret `AWS_ROLE_TO_ASSUME` with an IAM role ARN trusted for your GitHub OIDC provider and permitted to push to ECR.
 
-Run the workflow manually from the Actions tab and provide:
+Run the workflow manually from the Actions tab.
 
-* `image-tag` (required): image tag to publish.
-* `aws-region` (required): AWS region for ECR (defaults to `us-west-2`).
-* `ecr-repository` (required): destination ECR repository name.
-* `envoy-image` (optional): base Envoy image URI. If omitted, the workflow uses the latest value from SSM parameter `/aws/service/appmesh/envoy`.
+The workflow uses top-level environment values in `.github/workflows/docker-release.yml` for:
+
+* `AWS_REGION` (defaults to `us-west-2`)
+* `ECR_REPOSITORY` (defaults to `ecs-service-connect-agent`)
+
+The image tag is determined automatically from the latest semantic git tag (for example, `v1.2.3`) and incremented for the release push.
 
 ## Advanced Usage
 
